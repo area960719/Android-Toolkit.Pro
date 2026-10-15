@@ -25,20 +25,41 @@ jobs:
       run: nuget restore src/Android-Toolkit.Pro.csproj
 
     - name: Compilar en modo Release
-      run: msbuild src/Android-Toolkit.Pro.csproj /p:Configuration=Release /p:Platform="Any CPU" /v:minimal
+      run: msbuild src/Android-Toolkit.Pro.csproj /p:Configuration=Release /v:minimal
+
+    - name: Buscar el ejecutable generado
+      id: find_exe
+      shell: pwsh
+      run: |
+        $exe = Get-ChildItem -Path src\bin -Recurse -Filter "AndroidToolkitPro.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $exe) {
+          Write-Error "No se encontró AndroidToolkitPro.exe. Revisá el log de compilación."
+          exit 1
+        }
+        Write-Host "Ejecutable encontrado en: $($exe.Directory.FullName)"
+        "output_dir=$($exe.Directory.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
     - name: Verificar que la carpeta Tools se copió
+      shell: pwsh
       run: |
-        echo "=== Contenido de bin\Release ==="
-        dir src\bin\Release
-        echo "=== Contenido de bin\Release\Tools ==="
-        dir src\bin\Release\Tools
+        Write-Host "=== Contenido de la carpeta de salida ==="
+        Get-ChildItem "${{ steps.find_exe.outputs.output_dir }}"
+        Write-Host ""
+        Write-Host "=== Contenido de Tools ==="
+        if (Test-Path "${{ steps.find_exe.outputs.output_dir }}\Tools") {
+          Get-ChildItem "${{ steps.find_exe.outputs.output_dir }}\Tools"
+        } else {
+          Write-Warning "La carpeta Tools NO se copió. Revisá el .csproj"
+        }
 
     - name: Empaquetar el ejecutable + Tools
-      run: |
-        mkdir AndroidToolkitPro-Release
-        Copy-Item src\bin\Release\* AndroidToolkitPro-Release\ -Recurse -Force
       shell: pwsh
+      run: |
+        if (Test-Path "AndroidToolkitPro-Release") { Remove-Item "AndroidToolkitPro-Release" -Recurse -Force }
+        New-Item -ItemType Directory -Path "AndroidToolkitPro-Release" | Out-Null
+        Copy-Item "${{ steps.find_exe.outputs.output_dir }}\*" -Destination "AndroidToolkitPro-Release" -Recurse -Force
+        Write-Host "=== Contenido final empaquetado ==="
+        Get-ChildItem "AndroidToolkitPro-Release" -Recurse
 
     - name: Subir artefacto
       uses: actions/upload-artifact@v4
