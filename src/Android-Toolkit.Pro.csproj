@@ -1,3 +1,4 @@
+
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -21,8 +22,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
 
-  <!-- ⚠️ IMPORTANTE: Copia TODOS los archivos de Tools/ a la salida -->
+  <!-- ⚠️ IMPORTANTE: Copia las carpetas manteniendo su estructura original -->
   <ItemGroup>
-    <None Include="Tools\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Copiar Scrcpy -->
+    <Content Include="Tools\Scrcpy\**\*.*">
+      <Link>Tools\Scrcpy\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    
+    <!-- Copiar PlatformTools (Tu nuevo ADB) -->
+    <Content Include="Tools\PlatformTools\**\*.*">
+      <Link>Tools\PlatformTools\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>
