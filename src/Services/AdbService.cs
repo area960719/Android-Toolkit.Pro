@@ -14,11 +14,11 @@ namespace AndroidToolkitPro
         public string Serial { get; private set; }
         public string State { get; private set; }
         public string Desc { get; private set; }
-        
+
         public Dev(string serial, string state, string desc)
         {
-            Serial = serial; 
-            State = state; 
+            Serial = serial;
+            State = state;
             Desc = desc;
         }
     }
