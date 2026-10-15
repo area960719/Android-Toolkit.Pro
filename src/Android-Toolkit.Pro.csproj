@@ -10,6 +10,7 @@
     <RootNamespace>AndroidToolkitPro</RootNamespace>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,10 +21,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
 
-  <!-- Copia automática de toda la carpeta Tools a la carpeta de salida -->
+  <!-- ⚠️ IMPORTANTE: Copia TODOS los archivos de Tools/ a la salida -->
   <ItemGroup>
-    <None Update="Tools\**\*.*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Include="Tools\**\*.*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
