@@ -25,7 +25,7 @@ jobs:
       run: nuget restore src/Android-Toolkit.Pro.csproj
 
     - name: Compilar en modo Release
-      run: msbuild src/Android-Toolkit.Pro.csproj /p:Configuration=Release /v:minimal
+      run: msbuild src/Android-Toolkit.Pro.csproj /p:Configuration=Release /p:Platform=x64 /v:minimall
 
     - name: Buscar el ejecutable generado
       id: find_exe
