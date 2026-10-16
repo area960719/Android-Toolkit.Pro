@@ -12,58 +12,58 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Descargar el código
-      uses: actions/checkout@v4
+      - name: Descargar el código
+        uses: actions/checkout@v4
 
-    - name: Instalar .NET Framework 4.5.2 Developer Pack
-      run: choco install netfx-4.5.2-devpack -y --no-progress --ignore-checksums
+      - name: Instalar .NET Framework 4.5.2 Developer Pack
+        run: choco install netfx-4.5.2-devpack -y --no-progress --ignore-checksums
 
-    - name: Configurar MSBuild
-      uses: microsoft/setup-msbuild@v2
+      - name: Configurar MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-    - name: Restaurar dependencias
-      run: nuget restore src/Android-Toolkit.Pro.csproj
+      - name: Restaurar dependencias (x64)
+        run: msbuild src/Android-Toolkit.Pro.csproj /t:Restore /p:Configuration=Release /p:Platform=x64
 
-    - name: Compilar en modo Release
-      run: msbuild src/Android-Toolkit.Pro.csproj /p:Configuration=Release /p:Platform=x64 /v:minimal
+      - name: Compilar en modo Release (x64)
+        run: msbuild src/Android-Toolkit.Pro.csproj /p:Configuration=Release /p:Platform=x64 /v:minimal
 
-    - name: Buscar el ejecutable generado
-      id: find_exe
-      shell: pwsh
-      run: |
-        $exe = Get-ChildItem -Path src\bin -Recurse -Filter "AndroidToolkitPro.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($null -eq $exe) {
-          Write-Error "No se encontró AndroidToolkitPro.exe. Revisá el log de compilación."
-          exit 1
-        }
-        Write-Host "Ejecutable encontrado en: $($exe.Directory.FullName)"
-        "output_dir=$($exe.Directory.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      - name: Buscar el ejecutable generado
+        id: find_exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path src\bin -Recurse -Filter "AndroidToolkitPro.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $exe) {
+            Write-Error "No se encontró AndroidToolkitPro.exe. Revisá el log de compilación."
+            exit 1
+          }
+          Write-Host "Ejecutable encontrado en: $($exe.Directory.FullName)"
+          "output_dir=$($exe.Directory.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-    - name: Verificar que la carpeta Tools se copió
-      shell: pwsh
-      run: |
-        Write-Host "=== Contenido de la carpeta de salida ==="
-        Get-ChildItem "${{ steps.find_exe.outputs.output_dir }}"
-        Write-Host ""
-        Write-Host "=== Contenido de Tools ==="
-        if (Test-Path "${{ steps.find_exe.outputs.output_dir }}\Tools") {
-          Get-ChildItem "${{ steps.find_exe.outputs.output_dir }}\Tools"
-        } else {
-          Write-Warning "La carpeta Tools NO se copió. Revisá el .csproj"
-        }
+      - name: Verificar que la carpeta Tools se copió
+        shell: pwsh
+        run: |
+          Write-Host "=== Contenido de la carpeta de salida ==="
+          Get-ChildItem "${{ steps.find_exe.outputs.output_dir }}"
+          Write-Host ""
+          Write-Host "=== Contenido de Tools ==="
+          if (Test-Path "${{ steps.find_exe.outputs.output_dir }}\Tools") {
+            Get-ChildItem "${{ steps.find_exe.outputs.output_dir }}\Tools"
+          } else {
+            Write-Warning "La carpeta Tools NO se copió. Revisá el .csproj"
+          }
 
-    - name: Empaquetar el ejecutable + Tools
-      shell: pwsh
-      run: |
-        if (Test-Path "AndroidToolkitPro-Release") { Remove-Item "AndroidToolkitPro-Release" -Recurse -Force }
-        New-Item -ItemType Directory -Path "AndroidToolkitPro-Release" | Out-Null
-        Copy-Item "${{ steps.find_exe.outputs.output_dir }}\*" -Destination "AndroidToolkitPro-Release" -Recurse -Force
-        Write-Host "=== Contenido final empaquetado ==="
-        Get-ChildItem "AndroidToolkitPro-Release" -Recurse
+      - name: Empaquetar el ejecutable + Tools
+        shell: pwsh
+        run: |
+          if (Test-Path "AndroidToolkitPro-Release") { Remove-Item "AndroidToolkitPro-Release" -Recurse -Force }
+          New-Item -ItemType Directory -Path "AndroidToolkitPro-Release" | Out-Null
+          Copy-Item "${{ steps.find_exe.outputs.output_dir }}\*" -Destination "AndroidToolkitPro-Release" -Recurse -Force
+          Write-Host "=== Contenido final empaquetado ==="
+          Get-ChildItem "AndroidToolkitPro-Release" -Recurse
 
-    - name: Subir artefacto
-      uses: actions/upload-artifact@v4
-      with:
-        name: Android-Toolkit-Pro-Framework452
-        path: AndroidToolkitPro-Release/
-        retention-days: 30
+      - name: Subir artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-Toolkit-Pro-Framework452-x64
+          path: AndroidToolkitPro-Release/
+          retention-days: 30
