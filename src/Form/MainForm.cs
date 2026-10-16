@@ -18,6 +18,14 @@ namespace AndroidToolkitPro
         private Button btnEjecutarFastboot;
         private TextBox txtSalidaFastboot;
 
+        // Pestaña Herramientas Avanzadas
+        private TabPage tabAvanzado;
+        private Button btnGetvar;
+        private Button btnFlashBoot;
+        private Button btnFlashRecovery;
+        private Button btnSideload;
+        private TextBox txtSalidaAvanzado;
+
         // Pestaña APKs
         private TabPage tabApks;
         private Button btnInstalarApk;
@@ -40,33 +48,32 @@ namespace AndroidToolkitPro
         private bool _logcatActivo = false;
 
         // =========================================================
-        // CONSTRUCTOR (Aquí se crea toda la interfaz visual)
+        // CONSTRUCTOR
         // =========================================================
         public MainForm()
         {
             this.Text = "Android Toolkit Pro";
-            this.Size = new Size(720, 580);
+            this.Size = new Size(750, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(600, 450);
 
-            // Crear el control de pestañas
             tabControl = new TabControl();
             tabControl.Dock = DockStyle.Fill;
             this.Controls.Add(tabControl);
 
-            // Inicializar cada pestaña
             InicializarTabFastboot();
+            InicializarTabAvanzado();
             InicializarTabApks();
             InicializarTabArchivos();
             InicializarTabLogcat();
         }
 
         // =========================================================
-        // PESTAÑA 1: FASTBOOT (Tu código original adaptado)
+        // PESTAÑA 1: FASTBOOT BÁSICO
         // =========================================================
         private void InicializarTabFastboot()
         {
-            tabFastboot = new TabPage("Fastboot");
+            tabFastboot = new TabPage("Fastboot Básico");
             tabControl.TabPages.Add(tabFastboot);
 
             btnEjecutarFastboot = new Button();
@@ -78,7 +85,7 @@ namespace AndroidToolkitPro
 
             txtSalidaFastboot = new TextBox();
             txtSalidaFastboot.Location = new Point(20, 80);
-            txtSalidaFastboot.Size = new Size(650, 400);
+            txtSalidaFastboot.Size = new Size(680, 430);
             txtSalidaFastboot.Multiline = true;
             txtSalidaFastboot.ScrollBars = ScrollBars.Vertical;
             txtSalidaFastboot.ReadOnly = true;
@@ -91,55 +98,149 @@ namespace AndroidToolkitPro
         {
             txtSalidaFastboot.Clear();
             txtSalidaFastboot.AppendText("Iniciando prueba de Fastboot...\r\n\r\n");
-
-            string rutaBase = AppDomain.CurrentDomain.BaseDirectory;
-            string rutaFastboot = Path.Combine(rutaBase, "Tools", "PlatformTools", "fastboot.exe");
-
-            txtSalidaFastboot.AppendText("Buscando fastboot.exe en: " + rutaFastboot + "\r\n");
-
-            if (!File.Exists(rutaFastboot))
+            
+            string resultado = AdbHelper.RunFastbootCommand("devices");
+            
+            if (resultado.Contains("Error: No se encontró"))
             {
-                txtSalidaFastboot.AppendText("\r\n❌ ERROR: No se encontró fastboot.exe en la ruta especificada.\r\n");
+                txtSalidaFastboot.AppendText(resultado + "\r\n");
                 return;
             }
+            
+            txtSalidaFastboot.AppendText("--- RESPUESTA DE FASTBOOT ---\r\n" + resultado + "\r\n");
+        }
 
-            txtSalidaFastboot.AppendText("✅ Archivo encontrado. Ejecutando comando...\r\n\r\n");
+        // =========================================================
+        // PESTAÑA 2: HERRAMIENTAS AVANZADAS (SIN DEPURACIÓN USB)
+        // =========================================================
+        private void InicializarTabAvanzado()
+        {
+            tabAvanzado = new TabPage("Herramientas Avanzadas");
+            tabControl.TabPages.Add(tabAvanzado);
 
-            ProcessStartInfo psi = new ProcessStartInfo
+            // Botón Getvar
+            btnGetvar = new Button();
+            btnGetvar.Text = "Info del Dispositivo (getvar all)";
+            btnGetvar.Location = new Point(20, 20);
+            btnGetvar.Size = new Size(220, 40);
+            btnGetvar.Click += new EventHandler(this.btnGetvar_Click);
+            tabAvanzado.Controls.Add(btnGetvar);
+
+            // Botón Flashear Boot
+            btnFlashBoot = new Button();
+            btnFlashBoot.Text = "Flashear Boot.img";
+            btnFlashBoot.Location = new Point(250, 20);
+            btnFlashBoot.Size = new Size(160, 40);
+            btnFlashBoot.Click += new EventHandler(this.btnFlashBoot_Click);
+            tabAvanzado.Controls.Add(btnFlashBoot);
+
+            // Botón Flashear Recovery
+            btnFlashRecovery = new Button();
+            btnFlashRecovery.Text = "Flashear Recovery.img";
+            btnFlashRecovery.Location = new Point(420, 20);
+            btnFlashRecovery.Size = new Size(170, 40);
+            btnFlashRecovery.Click += new EventHandler(this.btnFlashRecovery_Click);
+            tabAvanzado.Controls.Add(btnFlashRecovery);
+
+            // Botón Sideload
+            btnSideload = new Button();
+            btnSideload.Text = "ADB Sideload (Recovery)";
+            btnSideload.Location = new Point(600, 20);
+            btnSideload.Size = new Size(160, 40);
+            btnSideload.Click += new EventHandler(this.btnSideload_Click);
+            tabAvanzado.Controls.Add(btnSideload);
+
+            // Caja de texto de salida
+            txtSalidaAvanzado = new TextBox();
+            txtSalidaAvanzado.Location = new Point(20, 80);
+            txtSalidaAvanzado.Size = new Size(680, 430);
+            txtSalidaAvanzado.Multiline = true;
+            txtSalidaAvanzado.ScrollBars = ScrollBars.Vertical;
+            txtSalidaAvanzado.ReadOnly = true;
+            txtSalidaAvanzado.Font = new Font("Consolas", 10);
+            txtSalidaAvanzado.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            tabAvanzado.Controls.Add(txtSalidaAvanzado);
+        }
+
+        private void btnGetvar_Click(object sender, EventArgs e)
+        {
+            txtSalidaAvanzado.Clear();
+            txtSalidaAvanzado.AppendText("Obteniendo información del dispositivo...\r\n\r\n");
+            
+            // getvar all devuelve mucha info. Aquí la mostramos completa.
+            string resultado = AdbHelper.RunFastbootCommand("getvar all");
+            
+            txtSalidaAvanzado.AppendText(resultado + "\r\n");
+        }
+
+        private void btnFlashBoot_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Imágenes (*.img)|*.img";
+            ofd.Title = "Selecciona el archivo boot.img";
+
+            if (ofd.ShowDialog() == DialogResult.OK)
             {
-                FileName = rutaFastboot,
-                Arguments = "devices",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+                DialogResult confirm = MessageBox.Show(
+                    "⚠️ ADVERTENCIA: Vas a flashear la partición BOOT.\n\n" +
+                    "Si el archivo es incorrecto, el teléfono podría no encender.\n\n" +
+                    "¿Estás seguro de continuar?",
+                    "Confirmar Flasheo",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
 
-            try
-            {
-                using (Process proceso = Process.Start(psi))
+                if (confirm == DialogResult.Yes)
                 {
-                    string salida = proceso.StandardOutput.ReadToEnd();
-                    string error = proceso.StandardError.ReadToEnd();
-                    proceso.WaitForExit();
-
-                    if (!string.IsNullOrEmpty(salida))
-                        txtSalidaFastboot.AppendText("--- RESPUESTA DE FASTBOOT ---\r\n" + salida + "\r\n");
-                    else
-                        txtSalidaFastboot.AppendText("Fastboot no devolvió ningún dispositivo. (Revisa la conexión).\r\n");
-
-                    if (!string.IsNullOrEmpty(error))
-                        txtSalidaFastboot.AppendText("\r\n--- ERRORES ---\r\n" + error + "\r\n");
+                    txtSalidaAvanzado.AppendText($"Flasheando {ofd.SafeFileName} en la partición boot...\r\n");
+                    string resultado = AdbHelper.RunFastbootCommand($"flash boot \"{ofd.FileName}\"");
+                    txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
                 }
             }
-            catch (Exception ex)
+        }
+
+        private void btnFlashRecovery_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Imágenes (*.img)|*.img";
+            ofd.Title = "Selecciona el archivo recovery.img";
+
+            if (ofd.ShowDialog() == DialogResult.OK)
             {
-                txtSalidaFastboot.AppendText("\r\n❌ ERROR CRÍTICO:\r\n" + ex.Message);
+                DialogResult confirm = MessageBox.Show(
+                    "⚠️ ADVERTENCIA: Vas a flashear la partición RECOVERY.\n\n" +
+                    "Asegúrate de que el archivo sea compatible con tu modelo exacto.\n\n" +
+                    "¿Estás seguro de continuar?",
+                    "Confirmar Flasheo",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (confirm == DialogResult.Yes)
+                {
+                    txtSalidaAvanzado.AppendText($"Flasheando {ofd.SafeFileName} en la partición recovery...\r\n");
+                    string resultado = AdbHelper.RunFastbootCommand($"flash recovery \"{ofd.FileName}\"");
+                    txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
+                }
+            }
+        }
+
+        private void btnSideload_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Archivos ZIP (*.zip)|*.zip";
+            ofd.Title = "Selecciona el archivo ZIP para Sideload";
+
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                txtSalidaAvanzado.AppendText($"Iniciando Sideload de {ofd.SafeFileName}...\r\n");
+                txtSalidaAvanzado.AppendText("Asegúrate de que el teléfono esté en Recovery y hayas seleccionado 'Apply update from ADB'.\r\n\r\n");
+                
+                string resultado = AdbHelper.RunCommand($"sideload \"{ofd.FileName}\"");
+                txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
             }
         }
 
         // =========================================================
-        // PESTAÑA 2: GESTOR DE APKS
+        // PESTAÑA 3: GESTOR DE APKS
         // =========================================================
         private void InicializarTabApks()
         {
@@ -174,7 +275,7 @@ namespace AndroidToolkitPro
 
             txtSalidaApks = new TextBox();
             txtSalidaApks.Location = new Point(20, 145);
-            txtSalidaApks.Size = new Size(650, 335);
+            txtSalidaApks.Size = new Size(680, 365);
             txtSalidaApks.Multiline = true;
             txtSalidaApks.ScrollBars = ScrollBars.Vertical;
             txtSalidaApks.ReadOnly = true;
@@ -200,12 +301,7 @@ namespace AndroidToolkitPro
         private void btnDesinstalarApk_Click(object sender, EventArgs e)
         {
             string paquete = txtPackageName.Text.Trim();
-
-            if (string.IsNullOrEmpty(paquete))
-            {
-                MessageBox.Show("Escribe el nombre del paquete (ej: com.whatsapp)");
-                return;
-            }
+            if (string.IsNullOrEmpty(paquete)) { MessageBox.Show("Escribe el nombre del paquete."); return; }
 
             txtSalidaApks.AppendText("Desinstalando: " + paquete + "...\r\n");
             string resultado = AdbHelper.RunCommand($"uninstall {paquete}");
@@ -213,7 +309,7 @@ namespace AndroidToolkitPro
         }
 
         // =========================================================
-        // PESTAÑA 3: EXPLORADOR DE ARCHIVOS (PUSH / PULL)
+        // PESTAÑA 4: EXPLORADOR DE ARCHIVOS (PUSH / PULL)
         // =========================================================
         private void InicializarTabArchivos()
         {
@@ -248,7 +344,7 @@ namespace AndroidToolkitPro
 
             txtSalidaArchivos = new TextBox();
             txtSalidaArchivos.Location = new Point(20, 145);
-            txtSalidaArchivos.Size = new Size(650, 335);
+            txtSalidaArchivos.Size = new Size(680, 365);
             txtSalidaArchivos.Multiline = true;
             txtSalidaArchivos.ScrollBars = ScrollBars.Vertical;
             txtSalidaArchivos.ReadOnly = true;
@@ -274,12 +370,7 @@ namespace AndroidToolkitPro
         private void btnPull_Click(object sender, EventArgs e)
         {
             string rutaAndroid = txtRutaAndroid.Text.Trim();
-
-            if (string.IsNullOrEmpty(rutaAndroid))
-            {
-                MessageBox.Show("Escribe la ruta del archivo en el teléfono (ej: /sdcard/Download/foto.jpg)");
-                return;
-            }
+            if (string.IsNullOrEmpty(rutaAndroid)) { MessageBox.Show("Escribe la ruta del archivo."); return; }
 
             FolderBrowserDialog fbd = new FolderBrowserDialog();
             fbd.Description = "Selecciona la carpeta donde guardar el archivo en tu PC";
@@ -293,7 +384,7 @@ namespace AndroidToolkitPro
         }
 
         // =========================================================
-        // PESTAÑA 4: LOGCAT EN TIEMPO REAL
+        // PESTAÑA 5: LOGCAT EN TIEMPO REAL
         // =========================================================
         private void InicializarTabLogcat()
         {
@@ -309,7 +400,7 @@ namespace AndroidToolkitPro
 
             rtbLogcat = new RichTextBox();
             rtbLogcat.Location = new Point(20, 80);
-            rtbLogcat.Size = new Size(650, 400);
+            rtbLogcat.Size = new Size(680, 430);
             rtbLogcat.ReadOnly = true;
             rtbLogcat.Font = new Font("Consolas", 9);
             rtbLogcat.BackColor = Color.Black;
@@ -377,7 +468,6 @@ namespace AndroidToolkitPro
 
         private void AgregarLog(RichTextBox rtb, string texto)
         {
-            // Colorear según el tipo de mensaje
             if (texto.Contains(" E ") || texto.Contains(" F "))
                 rtb.SelectionColor = Color.Red;
             else if (texto.Contains(" W "))
@@ -393,20 +483,31 @@ namespace AndroidToolkitPro
     }
 
     // =========================================================
-    // CLASE DE AYUDA (AdbHelper) - Incluida aquí para que no crees otro archivo
+    // CLASE DE AYUDA (ADB Y FASTBOOT)
     // =========================================================
     public static class AdbHelper
     {
         public static string AdbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "PlatformTools", "adb.exe");
+        public static string FastbootPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools", "PlatformTools", "fastboot.exe");
 
         public static string RunCommand(string arguments)
         {
-            if (!File.Exists(AdbPath)) 
-                return "Error: No se encontró adb.exe en " + AdbPath;
+            return RunProcess(AdbPath, arguments);
+        }
+
+        public static string RunFastbootCommand(string arguments)
+        {
+            return RunProcess(FastbootPath, arguments);
+        }
+
+        private static string RunProcess(string exePath, string arguments)
+        {
+            if (!File.Exists(exePath)) 
+                return "Error: No se encontró " + Path.GetFileName(exePath) + " en " + exePath;
 
             ProcessStartInfo psi = new ProcessStartInfo
             {
-                FileName = AdbPath,
+                FileName = exePath,
                 Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -421,7 +522,11 @@ namespace AndroidToolkitPro
                     string output = process.StandardOutput.ReadToEnd();
                     string error = process.StandardError.ReadToEnd();
                     process.WaitForExit();
-                    return string.IsNullOrEmpty(error) ? output : output + "\nERROR: " + error;
+                    
+                    if (!string.IsNullOrEmpty(error) && string.IsNullOrEmpty(output))
+                        return "ERROR: " + error;
+                        
+                    return output + (string.IsNullOrEmpty(error) ? "" : "\nADVERTENCIA: " + error);
                 }
             }
             catch (Exception ex)
