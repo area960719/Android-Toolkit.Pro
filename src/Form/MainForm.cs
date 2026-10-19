@@ -24,6 +24,7 @@ namespace AndroidToolkitPro
         private Button btnFlashBoot;
         private Button btnFlashRecovery;
         private Button btnSideload;
+        private Button btnRestablecerFabrica; // NUEVO BOTÓN
         private TextBox txtSalidaAvanzado;
 
         // Pestaña APKs
@@ -111,49 +112,56 @@ namespace AndroidToolkitPro
         }
 
         // =========================================================
-        // PESTAÑA 2: HERRAMIENTAS AVANZADAS (SIN DEPURACIÓN USB)
+        // PESTAÑA 2: HERRAMIENTAS AVANZADAS
         // =========================================================
         private void InicializarTabAvanzado()
         {
             tabAvanzado = new TabPage("Herramientas Avanzadas");
             tabControl.TabPages.Add(tabAvanzado);
 
-            // Botón Getvar
+            // Fila 1 de botones
             btnGetvar = new Button();
             btnGetvar.Text = "Info del Dispositivo (getvar all)";
             btnGetvar.Location = new Point(20, 20);
-            btnGetvar.Size = new Size(220, 40);
+            btnGetvar.Size = new Size(200, 40);
             btnGetvar.Click += new EventHandler(this.btnGetvar_Click);
             tabAvanzado.Controls.Add(btnGetvar);
 
-            // Botón Flashear Boot
             btnFlashBoot = new Button();
             btnFlashBoot.Text = "Flashear Boot.img";
-            btnFlashBoot.Location = new Point(250, 20);
-            btnFlashBoot.Size = new Size(160, 40);
+            btnFlashBoot.Location = new Point(230, 20);
+            btnFlashBoot.Size = new Size(150, 40);
             btnFlashBoot.Click += new EventHandler(this.btnFlashBoot_Click);
             tabAvanzado.Controls.Add(btnFlashBoot);
 
-            // Botón Flashear Recovery
             btnFlashRecovery = new Button();
             btnFlashRecovery.Text = "Flashear Recovery.img";
-            btnFlashRecovery.Location = new Point(420, 20);
-            btnFlashRecovery.Size = new Size(170, 40);
+            btnFlashRecovery.Location = new Point(390, 20);
+            btnFlashRecovery.Size = new Size(150, 40);
             btnFlashRecovery.Click += new EventHandler(this.btnFlashRecovery_Click);
             tabAvanzado.Controls.Add(btnFlashRecovery);
 
-            // Botón Sideload
+            // Fila 2 de botones
             btnSideload = new Button();
             btnSideload.Text = "ADB Sideload (Recovery)";
-            btnSideload.Location = new Point(600, 20);
-            btnSideload.Size = new Size(160, 40);
+            btnSideload.Location = new Point(20, 70);
+            btnSideload.Size = new Size(200, 40);
             btnSideload.Click += new EventHandler(this.btnSideload_Click);
             tabAvanzado.Controls.Add(btnSideload);
 
-            // Caja de texto de salida
+            // NUEVO BOTÓN: RESTABLECER FÁBRICA
+            btnRestablecerFabrica = new Button();
+            btnRestablecerFabrica.Text = "⚠️ Restablecer Fábrica";
+            btnRestablecerFabrica.Location = new Point(230, 70);
+            btnRestablecerFabrica.Size = new Size(180, 40);
+            btnRestablecerFabrica.BackColor = Color.LightCoral;
+            btnRestablecerFabrica.Click += new EventHandler(this.btnRestablecerFabrica_Click);
+            tabAvanzado.Controls.Add(btnRestablecerFabrica);
+
+            // Caja de texto de salida (se ajusta un poco hacia abajo para hacer espacio)
             txtSalidaAvanzado = new TextBox();
-            txtSalidaAvanzado.Location = new Point(20, 80);
-            txtSalidaAvanzado.Size = new Size(680, 430);
+            txtSalidaAvanzado.Location = new Point(20, 130);
+            txtSalidaAvanzado.Size = new Size(680, 380);
             txtSalidaAvanzado.Multiline = true;
             txtSalidaAvanzado.ScrollBars = ScrollBars.Vertical;
             txtSalidaAvanzado.ReadOnly = true;
@@ -166,10 +174,7 @@ namespace AndroidToolkitPro
         {
             txtSalidaAvanzado.Clear();
             txtSalidaAvanzado.AppendText("Obteniendo información del dispositivo...\r\n\r\n");
-            
-            // getvar all devuelve mucha info. Aquí la mostramos completa.
             string resultado = AdbHelper.RunFastbootCommand("getvar all");
-            
             txtSalidaAvanzado.AppendText(resultado + "\r\n");
         }
 
@@ -185,9 +190,7 @@ namespace AndroidToolkitPro
                     "⚠️ ADVERTENCIA: Vas a flashear la partición BOOT.\n\n" +
                     "Si el archivo es incorrecto, el teléfono podría no encender.\n\n" +
                     "¿Estás seguro de continuar?",
-                    "Confirmar Flasheo",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
+                    "Confirmar Flasheo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
                 if (confirm == DialogResult.Yes)
                 {
@@ -210,9 +213,7 @@ namespace AndroidToolkitPro
                     "⚠️ ADVERTENCIA: Vas a flashear la partición RECOVERY.\n\n" +
                     "Asegúrate de que el archivo sea compatible con tu modelo exacto.\n\n" +
                     "¿Estás seguro de continuar?",
-                    "Confirmar Flasheo",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
+                    "Confirmar Flasheo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
                 if (confirm == DialogResult.Yes)
                 {
@@ -233,9 +234,45 @@ namespace AndroidToolkitPro
             {
                 txtSalidaAvanzado.AppendText($"Iniciando Sideload de {ofd.SafeFileName}...\r\n");
                 txtSalidaAvanzado.AppendText("Asegúrate de que el teléfono esté en Recovery y hayas seleccionado 'Apply update from ADB'.\r\n\r\n");
-                
                 string resultado = AdbHelper.RunCommand($"sideload \"{ofd.FileName}\"");
                 txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
+            }
+        }
+
+        // =========================================================
+        // EVENTO DEL NUEVO BOTÓN: RESTABLECER FÁBRICA
+        // =========================================================
+        private void btnRestablecerFabrica_Click(object sender, EventArgs e)
+        {
+            DialogResult confirm = MessageBox.Show(
+                "🚨 ¡ADVERTENCIA EXTREMA! 🚨\n\n" +
+                "Esta acción borrará TODOS los datos del teléfono (Fotos, contactos, aplicaciones, etc.).\n\n" +
+                "El dispositivo debe estar en modo Fastboot.\n\n" +
+                "¿Estás COMPLETAMENTE seguro de que deseas continuar?",
+                "Confirmar Restablecimiento de Fábrica", 
+                MessageBoxButtons.YesNo, 
+                MessageBoxIcon.Stop);
+
+            if (confirm == DialogResult.Yes)
+            {
+                txtSalidaAvanzado.AppendText("Iniciando restablecimiento de fábrica (Wipe de datos)...\r\n");
+                
+                // OPCIÓN A: Usar el comando nativo de Fastboot para borrar datos (Recomendado)
+                string resultado = AdbHelper.RunFastbootCommand("-w");
+                txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
+
+                // OPCIÓN B: Si quieres usar tu archivo RestablecimientoFabrica.cs, 
+                // borra las dos líneas de arriba (OPCIÓN A) y descomenta esto:
+                /*
+                try {
+                    RestablecimientoFabrica reset = new RestablecimientoFabrica();
+                    reset.Ejecutar(); // Cambia "Ejecutar" por el método real que hayas creado
+                    txtSalidaAvanzado.AppendText("Restablecimiento completado usando la clase personalizada.\r\n");
+                }
+                catch (Exception ex) {
+                    txtSalidaAvanzado.AppendText("Error al llamar a RestablecimientoFabrica: " + ex.Message + "\r\n");
+                }
+                */
             }
         }
 
