@@ -240,41 +240,56 @@ namespace AndroidToolkitPro
         }
 
         // =========================================================
-        // EVENTO DEL NUEVO BOTÓN: RESTABLECER FÁBRICA
-        // =========================================================
-        private void btnRestablecerFabrica_Click(object sender, EventArgs e)
+// EVENTO DEL NUEVO BOTÓN: RESTABLECER FÁBRICA
+// =========================================================
+private void btnRestablecerFabrica_Click(object sender, EventArgs e)
+{
+    DialogResult confirm = MessageBox.Show(
+        "🚨 ¡ADVERTENCIA EXTREMA! 🚨\n\n" +
+        "Esta acción intentará borrar TODOS los datos del teléfono.\n\n" +
+        "¿Deseas continuar?",
+        "Confirmar Restablecimiento", MessageBoxButtons.YesNo, MessageBoxIcon.Stop);
+
+    if (confirm != DialogResult.Yes) return;
+
+    txtSalidaAvanzado.AppendText("=== INICIANDO PROTOCOLO DE RESTABLECIMIENTO ===\r\n");
+
+    // 1. Verificar si el teléfono está en Fastboot (Bootloader)
+    string fastbootDevices = AdbHelper.RunFastbootCommand("devices");
+    if (fastbootDevices.Contains("fastboot")) // Si detecta un dispositivo en fastboot
+    {
+        txtSalidaAvanzado.AppendText("Teléfono detectado en modo FASTBOOT.\r\n");
+        txtSalidaAvanzado.AppendText("Intentando borrar datos (requiere Bootloader Desbloqueado)...\r\n");
+        
+        string resultado = AdbHelper.RunFastbootCommand("-w");
+        txtSalidaAvanzado.AppendText(resultado + "\r\n");
+        
+        if (resultado.Contains("FAILED") || resultado.Contains("not allowed") || resultado.Contains("unknown"))
         {
-            DialogResult confirm = MessageBox.Show(
-                "🚨 ¡ADVERTENCIA EXTREMA! 🚨\n\n" +
-                "Esta acción borrará TODOS los datos del teléfono (Fotos, contactos, aplicaciones, etc.).\n\n" +
-                "El dispositivo debe estar en modo Fastboot.\n\n" +
-                "¿Estás COMPLETAMENTE seguro de que deseas continuar?",
-                "Confirmar Restablecimiento de Fábrica", 
-                MessageBoxButtons.YesNo, 
-                MessageBoxIcon.Stop);
-
-            if (confirm == DialogResult.Yes)
-            {
-                txtSalidaAvanzado.AppendText("Iniciando restablecimiento de fábrica (Wipe de datos)...\r\n");
-                
-                // OPCIÓN A: Usar el comando nativo de Fastboot para borrar datos (Recomendado)
-                string resultado = AdbHelper.RunFastbootCommand("-w");
-                txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
-
-                // OPCIÓN B: Si quieres usar tu archivo RestablecimientoFabrica.cs, 
-                // borra las dos líneas de arriba (OPCIÓN A) y descomenta esto:
-                /*
-                try {
-                    RestablecimientoFabrica reset = new RestablecimientoFabrica();
-                    reset.Ejecutar(); // Cambia "Ejecutar" por el método real que hayas creado
-                    txtSalidaAvanzado.AppendText("Restablecimiento completado usando la clase personalizada.\r\n");
-                }
-                catch (Exception ex) {
-                    txtSalidaAvanzado.AppendText("Error al llamar a RestablecimientoFabrica: " + ex.Message + "\r\n");
-                }
-                */
-            }
+            txtSalidaAvanzado.AppendText("❌ ERROR: El Bootloader está bloqueado o no soporta el comando. No se puede borrar por Fastboot.\r\n");
+            txtSalidaAvanzado.AppendText("👉 Instrucción: Usa los botones físicos del teléfono para entrar al Recovery y seleccionar 'Wipe Data/Factory Reset'.\r\n");
         }
+        return;
+    }
+
+    // 2. Verificar si el teléfono está encendido con Depuración USB
+    string adbDevices = AdbHelper.RunCommand("devices");
+    if (adbDevices.Contains("device") && !adbDevices.Contains("List of devices")) 
+    {
+        txtSalidaAvanzado.AppendText("Teléfono detectado vía ADB (Encendido).\r\n");
+        txtSalidaAvanzado.AppendText("Reiniciando al modo Recovery...\r\n");
+        
+        // Enviar al recovery
+        AdbHelper.RunCommand("reboot recovery");
+        txtSalidaAvanzado.AppendText("El teléfono se está reiniciando al Recovery.\r\n");
+        txtSalidaAvanzado.AppendText("👉 Instrucción: En la pantalla del teléfono, usa los botones de Volumen para elegir 'Wipe data/factory reset' y confirma con el botón de Encendido.\r\n");
+        return;
+    }
+
+    // 3. Si no se detecta nada
+    txtSalidaAvanzado.AppendText("❌ No se detectó ningún teléfono conectado en modo ADB ni Fastboot.\r\n");
+    txtSalidaAvanzado.AppendText("👉 Asegúrate de que el cable esté bien conectado y el teléfono esté en modo Fastboot o con Depuración USB activa.\r\n");
+}
 
         // =========================================================
         // PESTAÑA 3: GESTOR DE APKS
