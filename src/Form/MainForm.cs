@@ -3,14 +3,20 @@ using System.Diagnostics;
 using System.IO;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace AndroidToolkitPro
 {
     public class MainForm : Form
     {
         // =========================================================
-        // CONTROLES DE LA INTERFAZ
+        // CONTROLES GLOBALES (Selector de Dispositivo)
         // =========================================================
+        private Panel panelSuperior;
+        private ComboBox cmbDispositivos;
+        private Button btnRefrescarDispositivos;
+        private Label lblDispositivoActual;
+
         private TabControl tabControl;
 
         // Pestaña Fastboot
@@ -24,14 +30,14 @@ namespace AndroidToolkitPro
         private Button btnFlashBoot;
         private Button btnFlashRecovery;
         private Button btnSideload;
-        private Button btnRestablecerFabrica; // NUEVO BOTÓN
         private TextBox txtSalidaAvanzado;
 
-        // Pestaña APKs
+        // Pestaña APKs (Ahora con ComboBox)
         private TabPage tabApks;
         private Button btnInstalarApk;
         private Button btnDesinstalarApk;
-        private TextBox txtPackageName;
+        private ComboBox cmbAppsInstaladas;
+        private Button btnCargarApps;
         private TextBox txtSalidaApks;
 
         // Pestaña Archivos (Push/Pull)
@@ -54,19 +60,113 @@ namespace AndroidToolkitPro
         public MainForm()
         {
             this.Text = "Android Toolkit Pro";
-            this.Size = new Size(750, 600);
+            this.Size = new Size(780, 650);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.MinimumSize = new Size(600, 450);
+            this.MinimumSize = new Size(650, 500);
 
+            // 1. Crear el Panel Superior (Selector de Dispositivo)
+            InicializarPanelSuperior();
+
+            // 2. Crear el Panel de Pestañas (debajo del panel superior)
             tabControl = new TabControl();
             tabControl.Dock = DockStyle.Fill;
             this.Controls.Add(tabControl);
+            // Asegurarse de que el TabControl esté debajo del panel superior
+            tabControl.BringToFront(); 
+            panelSuperior.SendToBack();
 
             InicializarTabFastboot();
             InicializarTabAvanzado();
             InicializarTabApks();
             InicializarTabArchivos();
             InicializarTabLogcat();
+
+            // Cargar dispositivos al abrir el programa
+            RefrescarDispositivos();
+        }
+
+        // =========================================================
+        // PANEL SUPERIOR: SELECTOR DE DISPOSITIVO
+        // =========================================================
+        private void InicializarPanelSuperior()
+        {
+            panelSuperior = new Panel();
+            panelSuperior.Dock = DockStyle.Top;
+            panelSuperior.Height = 50;
+            panelSuperior.BackColor = Color.LightGray;
+            this.Controls.Add(panelSuperior);
+
+            lblDispositivoActual = new Label();
+            lblDispositivoActual.Text = "Dispositivo conectado:";
+            lblDispositivoActual.Location = new Point(10, 15);
+            lblDispositivoActual.AutoSize = true;
+            lblDispositivoActual.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+            panelSuperior.Controls.Add(lblDispositivoActual);
+
+            cmbDispositivos = new ComboBox();
+            cmbDispositivos.Location = new Point(150, 12);
+            cmbDispositivos.Width = 300;
+            cmbDispositivos.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbDispositivos.SelectedIndexChanged += (s, e) => { /* Actualizar algo si es necesario */ };
+            panelSuperior.Controls.Add(cmbDispositivos);
+
+            btnRefrescarDispositivos = new Button();
+            btnRefrescarDispositivos.Text = "🔄 Refrescar Lista";
+            btnRefrescarDispositivos.Location = new Point(460, 10);
+            btnRefrescarDispositivos.Size = new Size(120, 28);
+            btnRefrescarDispositivos.Click += new EventHandler(this.btnRefrescarDispositivos_Click);
+            panelSuperior.Controls.Add(btnRefrescarDispositivos);
+        }
+
+        private void btnRefrescarDispositivos_Click(object sender, EventArgs e)
+        {
+            RefrescarDispositivos();
+        }
+
+        private void RefrescarDispositivos()
+        {
+            cmbDispositivos.Items.Clear();
+            string resultado = AdbHelper.RunCommand("devices");
+
+            // Parsear la salida de 'adb devices'
+            string[] lineas = resultado.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string linea in lineas)
+            {
+                if (linea.Contains("\tdevice"))
+                {
+                    string serial = linea.Split('\t')[0].Trim();
+                    // Obtener el modelo del teléfono para mostrarlo bonito
+                    string modelo = AdbHelper.RunCommand($"-s {serial} shell getprop ro.product.model").Trim();
+                    
+                    if (string.IsNullOrEmpty(modelo) || modelo.Contains("Error"))
+                        modelo = "Desconocido";
+
+                    cmbDispositivos.Items.Add($"{modelo} ({serial})");
+                }
+            }
+
+            if (cmbDispositivos.Items.Count > 0)
+            {
+                cmbDispositivos.SelectedIndex = 0;
+            }
+            else
+            {
+                cmbDispositivos.Items.Add("No hay dispositivos conectados");
+                cmbDispositivos.SelectedIndex = 0;
+            }
+        }
+
+        // Función auxiliar para obtener el serial del dispositivo seleccionado
+        private string ObtenerSerialSeleccionado()
+        {
+            if (cmbDispositivos.SelectedItem == null || cmbDispositivos.SelectedItem.ToString().Contains("No hay"))
+                return null;
+
+            string item = cmbDispositivos.SelectedItem.ToString();
+            // Extrae lo que está entre paréntesis: Modelo (SERIAL)
+            int inicio = item.LastIndexOf('(') + 1;
+            int fin = item.LastIndexOf(')');
+            return item.Substring(inicio, fin - inicio);
         }
 
         // =========================================================
@@ -86,7 +186,7 @@ namespace AndroidToolkitPro
 
             txtSalidaFastboot = new TextBox();
             txtSalidaFastboot.Location = new Point(20, 80);
-            txtSalidaFastboot.Size = new Size(680, 430);
+            txtSalidaFastboot.Size = new Size(710, 480);
             txtSalidaFastboot.Multiline = true;
             txtSalidaFastboot.ScrollBars = ScrollBars.Vertical;
             txtSalidaFastboot.ReadOnly = true;
@@ -99,15 +199,7 @@ namespace AndroidToolkitPro
         {
             txtSalidaFastboot.Clear();
             txtSalidaFastboot.AppendText("Iniciando prueba de Fastboot...\r\n\r\n");
-            
             string resultado = AdbHelper.RunFastbootCommand("devices");
-            
-            if (resultado.Contains("Error: No se encontró"))
-            {
-                txtSalidaFastboot.AppendText(resultado + "\r\n");
-                return;
-            }
-            
             txtSalidaFastboot.AppendText("--- RESPUESTA DE FASTBOOT ---\r\n" + resultado + "\r\n");
         }
 
@@ -119,49 +211,37 @@ namespace AndroidToolkitPro
             tabAvanzado = new TabPage("Herramientas Avanzadas");
             tabControl.TabPages.Add(tabAvanzado);
 
-            // Fila 1 de botones
             btnGetvar = new Button();
             btnGetvar.Text = "Info del Dispositivo (getvar all)";
             btnGetvar.Location = new Point(20, 20);
-            btnGetvar.Size = new Size(200, 40);
+            btnGetvar.Size = new Size(220, 40);
             btnGetvar.Click += new EventHandler(this.btnGetvar_Click);
             tabAvanzado.Controls.Add(btnGetvar);
 
             btnFlashBoot = new Button();
             btnFlashBoot.Text = "Flashear Boot.img";
-            btnFlashBoot.Location = new Point(230, 20);
-            btnFlashBoot.Size = new Size(150, 40);
+            btnFlashBoot.Location = new Point(250, 20);
+            btnFlashBoot.Size = new Size(160, 40);
             btnFlashBoot.Click += new EventHandler(this.btnFlashBoot_Click);
             tabAvanzado.Controls.Add(btnFlashBoot);
 
             btnFlashRecovery = new Button();
             btnFlashRecovery.Text = "Flashear Recovery.img";
-            btnFlashRecovery.Location = new Point(390, 20);
-            btnFlashRecovery.Size = new Size(150, 40);
+            btnFlashRecovery.Location = new Point(420, 20);
+            btnFlashRecovery.Size = new Size(170, 40);
             btnFlashRecovery.Click += new EventHandler(this.btnFlashRecovery_Click);
             tabAvanzado.Controls.Add(btnFlashRecovery);
 
-            // Fila 2 de botones
             btnSideload = new Button();
             btnSideload.Text = "ADB Sideload (Recovery)";
-            btnSideload.Location = new Point(20, 70);
-            btnSideload.Size = new Size(200, 40);
+            btnSideload.Location = new Point(600, 20);
+            btnSideload.Size = new Size(130, 40);
             btnSideload.Click += new EventHandler(this.btnSideload_Click);
             tabAvanzado.Controls.Add(btnSideload);
 
-            // NUEVO BOTÓN: RESTABLECER FÁBRICA
-            btnRestablecerFabrica = new Button();
-            btnRestablecerFabrica.Text = "⚠️ Restablecer Fábrica";
-            btnRestablecerFabrica.Location = new Point(230, 70);
-            btnRestablecerFabrica.Size = new Size(180, 40);
-            btnRestablecerFabrica.BackColor = Color.LightCoral;
-            btnRestablecerFabrica.Click += new EventHandler(this.btnRestablecerFabrica_Click);
-            tabAvanzado.Controls.Add(btnRestablecerFabrica);
-
-            // Caja de texto de salida (se ajusta un poco hacia abajo para hacer espacio)
             txtSalidaAvanzado = new TextBox();
-            txtSalidaAvanzado.Location = new Point(20, 130);
-            txtSalidaAvanzado.Size = new Size(680, 380);
+            txtSalidaAvanzado.Location = new Point(20, 80);
+            txtSalidaAvanzado.Size = new Size(710, 480);
             txtSalidaAvanzado.Multiline = true;
             txtSalidaAvanzado.ScrollBars = ScrollBars.Vertical;
             txtSalidaAvanzado.ReadOnly = true;
@@ -174,8 +254,7 @@ namespace AndroidToolkitPro
         {
             txtSalidaAvanzado.Clear();
             txtSalidaAvanzado.AppendText("Obteniendo información del dispositivo...\r\n\r\n");
-            string resultado = AdbHelper.RunFastbootCommand("getvar all");
-            txtSalidaAvanzado.AppendText(resultado + "\r\n");
+            txtSalidaAvanzado.AppendText(AdbHelper.RunFastbootCommand("getvar all") + "\r\n");
         }
 
         private void btnFlashBoot_Click(object sender, EventArgs e)
@@ -186,17 +265,10 @@ namespace AndroidToolkitPro
 
             if (ofd.ShowDialog() == DialogResult.OK)
             {
-                DialogResult confirm = MessageBox.Show(
-                    "⚠️ ADVERTENCIA: Vas a flashear la partición BOOT.\n\n" +
-                    "Si el archivo es incorrecto, el teléfono podría no encender.\n\n" +
-                    "¿Estás seguro de continuar?",
-                    "Confirmar Flasheo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-
-                if (confirm == DialogResult.Yes)
+                if (MessageBox.Show("⚠️ ADVERTENCIA: Vas a flashear BOOT.\n¿Continuar?", "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                 {
-                    txtSalidaAvanzado.AppendText($"Flasheando {ofd.SafeFileName} en la partición boot...\r\n");
-                    string resultado = AdbHelper.RunFastbootCommand($"flash boot \"{ofd.FileName}\"");
-                    txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
+                    txtSalidaAvanzado.AppendText($"Flasheando {ofd.SafeFileName}...\r\n");
+                    txtSalidaAvanzado.AppendText(AdbHelper.RunFastbootCommand($"flash boot \"{ofd.FileName}\"") + "\r\n\r\n");
                 }
             }
         }
@@ -209,17 +281,10 @@ namespace AndroidToolkitPro
 
             if (ofd.ShowDialog() == DialogResult.OK)
             {
-                DialogResult confirm = MessageBox.Show(
-                    "⚠️ ADVERTENCIA: Vas a flashear la partición RECOVERY.\n\n" +
-                    "Asegúrate de que el archivo sea compatible con tu modelo exacto.\n\n" +
-                    "¿Estás seguro de continuar?",
-                    "Confirmar Flasheo", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-
-                if (confirm == DialogResult.Yes)
+                if (MessageBox.Show("⚠️ ADVERTENCIA: Vas a flashear RECOVERY.\n¿Continuar?", "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                 {
-                    txtSalidaAvanzado.AppendText($"Flasheando {ofd.SafeFileName} en la partición recovery...\r\n");
-                    string resultado = AdbHelper.RunFastbootCommand($"flash recovery \"{ofd.FileName}\"");
-                    txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
+                    txtSalidaAvanzado.AppendText($"Flasheando {ofd.SafeFileName}...\r\n");
+                    txtSalidaAvanzado.AppendText(AdbHelper.RunFastbootCommand($"flash recovery \"{ofd.FileName}\"") + "\r\n\r\n");
                 }
             }
         }
@@ -233,66 +298,12 @@ namespace AndroidToolkitPro
             if (ofd.ShowDialog() == DialogResult.OK)
             {
                 txtSalidaAvanzado.AppendText($"Iniciando Sideload de {ofd.SafeFileName}...\r\n");
-                txtSalidaAvanzado.AppendText("Asegúrate de que el teléfono esté en Recovery y hayas seleccionado 'Apply update from ADB'.\r\n\r\n");
-                string resultado = AdbHelper.RunCommand($"sideload \"{ofd.FileName}\"");
-                txtSalidaAvanzado.AppendText(resultado + "\r\n\r\n");
+                txtSalidaAvanzado.AppendText(AdbHelper.RunCommand($"sideload \"{ofd.FileName}\"") + "\r\n\r\n");
             }
         }
 
         // =========================================================
-// EVENTO DEL NUEVO BOTÓN: RESTABLECER FÁBRICA
-// =========================================================
-private void btnRestablecerFabrica_Click(object sender, EventArgs e)
-{
-    DialogResult confirm = MessageBox.Show(
-        "🚨 ¡ADVERTENCIA EXTREMA! 🚨\n\n" +
-        "Esta acción intentará borrar TODOS los datos del teléfono.\n\n" +
-        "¿Deseas continuar?",
-        "Confirmar Restablecimiento", MessageBoxButtons.YesNo, MessageBoxIcon.Stop);
-
-    if (confirm != DialogResult.Yes) return;
-
-    txtSalidaAvanzado.AppendText("=== INICIANDO PROTOCOLO DE RESTABLECIMIENTO ===\r\n");
-
-    // 1. Verificar si el teléfono está en Fastboot (Bootloader)
-    string fastbootDevices = AdbHelper.RunFastbootCommand("devices");
-    if (fastbootDevices.Contains("fastboot")) // Si detecta un dispositivo en fastboot
-    {
-        txtSalidaAvanzado.AppendText("Teléfono detectado en modo FASTBOOT.\r\n");
-        txtSalidaAvanzado.AppendText("Intentando borrar datos (requiere Bootloader Desbloqueado)...\r\n");
-        
-        string resultado = AdbHelper.RunFastbootCommand("-w");
-        txtSalidaAvanzado.AppendText(resultado + "\r\n");
-        
-        if (resultado.Contains("FAILED") || resultado.Contains("not allowed") || resultado.Contains("unknown"))
-        {
-            txtSalidaAvanzado.AppendText("❌ ERROR: El Bootloader está bloqueado o no soporta el comando. No se puede borrar por Fastboot.\r\n");
-            txtSalidaAvanzado.AppendText("👉 Instrucción: Usa los botones físicos del teléfono para entrar al Recovery y seleccionar 'Wipe Data/Factory Reset'.\r\n");
-        }
-        return;
-    }
-
-    // 2. Verificar si el teléfono está encendido con Depuración USB
-    string adbDevices = AdbHelper.RunCommand("devices");
-    if (adbDevices.Contains("device") && !adbDevices.Contains("List of devices")) 
-    {
-        txtSalidaAvanzado.AppendText("Teléfono detectado vía ADB (Encendido).\r\n");
-        txtSalidaAvanzado.AppendText("Reiniciando al modo Recovery...\r\n");
-        
-        // Enviar al recovery
-        AdbHelper.RunCommand("reboot recovery");
-        txtSalidaAvanzado.AppendText("El teléfono se está reiniciando al Recovery.\r\n");
-        txtSalidaAvanzado.AppendText("👉 Instrucción: En la pantalla del teléfono, usa los botones de Volumen para elegir 'Wipe data/factory reset' y confirma con el botón de Encendido.\r\n");
-        return;
-    }
-
-    // 3. Si no se detecta nada
-    txtSalidaAvanzado.AppendText("❌ No se detectó ningún teléfono conectado en modo ADB ni Fastboot.\r\n");
-    txtSalidaAvanzado.AppendText("👉 Asegúrate de que el cable esté bien conectado y el teléfono esté en modo Fastboot o con Depuración USB activa.\r\n");
-}
-
-        // =========================================================
-        // PESTAÑA 3: GESTOR DE APKS
+        // PESTAÑA 3: GESTOR DE APKS (CON SELECTOR DE APPS)
         // =========================================================
         private void InicializarTabApks()
         {
@@ -306,28 +317,29 @@ private void btnRestablecerFabrica_Click(object sender, EventArgs e)
             btnInstalarApk.Click += new EventHandler(this.btnInstalarApk_Click);
             tabApks.Controls.Add(btnInstalarApk);
 
+            btnCargarApps = new Button();
+            btnCargarApps.Text = "🔄 Cargar Apps Instaladas";
+            btnCargarApps.Location = new Point(180, 20);
+            btnCargarApps.Size = new Size(180, 40);
+            btnCargarApps.Click += new EventHandler(this.btnCargarApps_Click);
+            tabApks.Controls.Add(btnCargarApps);
+
+            cmbAppsInstaladas = new ComboBox();
+            cmbAppsInstaladas.Location = new Point(20, 80);
+            cmbAppsInstaladas.Size = new Size(340, 25);
+            cmbAppsInstaladas.DropDownStyle = ComboBoxStyle.DropDownList;
+            tabApks.Controls.Add(cmbAppsInstaladas);
+
             btnDesinstalarApk = new Button();
-            btnDesinstalarApk.Text = "Desinstalar APK";
-            btnDesinstalarApk.Location = new Point(180, 20);
-            btnDesinstalarApk.Size = new Size(150, 40);
+            btnDesinstalarApk.Text = "Desinstalar App Seleccionada";
+            btnDesinstalarApk.Location = new Point(370, 75);
+            btnDesinstalarApk.Size = new Size(200, 32);
             btnDesinstalarApk.Click += new EventHandler(this.btnDesinstalarApk_Click);
             tabApks.Controls.Add(btnDesinstalarApk);
 
-            Label lblPackage = new Label();
-            lblPackage.Text = "Paquete a desinstalar:";
-            lblPackage.Location = new Point(20, 80);
-            lblPackage.AutoSize = true;
-            tabApks.Controls.Add(lblPackage);
-
-            txtPackageName = new TextBox();
-            txtPackageName.Location = new Point(20, 105);
-            txtPackageName.Size = new Size(310, 25);
-            txtPackageName.Text = "com.ejemplo.app";
-            tabApks.Controls.Add(txtPackageName);
-
             txtSalidaApks = new TextBox();
-            txtSalidaApks.Location = new Point(20, 145);
-            txtSalidaApks.Size = new Size(680, 365);
+            txtSalidaApks.Location = new Point(20, 130);
+            txtSalidaApks.Size = new Size(710, 430);
             txtSalidaApks.Multiline = true;
             txtSalidaApks.ScrollBars = ScrollBars.Vertical;
             txtSalidaApks.ReadOnly = true;
@@ -336,28 +348,67 @@ private void btnRestablecerFabrica_Click(object sender, EventArgs e)
             tabApks.Controls.Add(txtSalidaApks);
         }
 
+        private void btnCargarApps_Click(object sender, EventArgs e)
+        {
+            string serial = ObtenerSerialSeleccionado();
+            if (serial == null) { MessageBox.Show("Selecciona un dispositivo primero."); return; }
+
+            cmbAppsInstaladas.Items.Clear();
+            txtSalidaApks.AppendText("Cargando lista de aplicaciones (esto puede tardar unos segundos)...\r\n");
+            
+            // Comando para listar solo apps de usuario (-3) y mostrarlas como "package:com.ejemplo"
+            string resultado = AdbHelper.RunCommand($"-s {serial} shell pm list packages -3");
+            
+            string[] lineas = resultado.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            int contador = 0;
+            foreach (string linea in lineas)
+            {
+                if (linea.StartsWith("package:"))
+                {
+                    string paquete = linea.Replace("package:", "").Trim();
+                    cmbAppsInstaladas.Items.Add(paquete);
+                    contador++;
+                }
+            }
+            txtSalidaApks.AppendText($"Se cargaron {contador} aplicaciones.\r\n\r\n");
+        }
+
         private void btnInstalarApk_Click(object sender, EventArgs e)
         {
+            string serial = ObtenerSerialSeleccionado();
+            if (serial == null) { MessageBox.Show("Selecciona un dispositivo primero."); return; }
+
             OpenFileDialog ofd = new OpenFileDialog();
             ofd.Filter = "Archivos APK (*.apk)|*.apk";
-            ofd.Title = "Selecciona la APK para instalar";
 
             if (ofd.ShowDialog() == DialogResult.OK)
             {
                 txtSalidaApks.AppendText("Instalando: " + ofd.SafeFileName + "...\r\n");
-                string resultado = AdbHelper.RunCommand($"install -r \"{ofd.FileName}\"");
+                string resultado = AdbHelper.RunCommand($"-s {serial} install -r \"{ofd.FileName}\"");
                 txtSalidaApks.AppendText(resultado + "\r\n\r\n");
             }
         }
 
         private void btnDesinstalarApk_Click(object sender, EventArgs e)
         {
-            string paquete = txtPackageName.Text.Trim();
-            if (string.IsNullOrEmpty(paquete)) { MessageBox.Show("Escribe el nombre del paquete."); return; }
+            string serial = ObtenerSerialSeleccionado();
+            if (serial == null) { MessageBox.Show("Selecciona un dispositivo primero."); return; }
 
-            txtSalidaApks.AppendText("Desinstalando: " + paquete + "...\r\n");
-            string resultado = AdbHelper.RunCommand($"uninstall {paquete}");
-            txtSalidaApks.AppendText(resultado + "\r\n\r\n");
+            if (cmbAppsInstaladas.SelectedItem == null)
+            {
+                MessageBox.Show("Primero haz clic en 'Cargar Apps Instaladas' y selecciona una app de la lista.");
+                return;
+            }
+
+            string paquete = cmbAppsInstaladas.SelectedItem.ToString();
+
+            if (MessageBox.Show($"¿Estás seguro de desinstalar '{paquete}' del teléfono {serial}?", "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                txtSalidaApks.AppendText("Desinstalando: " + paquete + "...\r\n");
+                string resultado = AdbHelper.RunCommand($"-s {serial} uninstall {paquete}");
+                txtSalidaApks.AppendText(resultado + "\r\n\r\n");
+                cmbAppsInstaladas.Items.Remove(paquete); // Quitarlo de la lista visual
+            }
         }
 
         // =========================================================
@@ -396,7 +447,7 @@ private void btnRestablecerFabrica_Click(object sender, EventArgs e)
 
             txtSalidaArchivos = new TextBox();
             txtSalidaArchivos.Location = new Point(20, 145);
-            txtSalidaArchivos.Size = new Size(680, 365);
+            txtSalidaArchivos.Size = new Size(710, 415);
             txtSalidaArchivos.Multiline = true;
             txtSalidaArchivos.ScrollBars = ScrollBars.Vertical;
             txtSalidaArchivos.ReadOnly = true;
@@ -407,30 +458,32 @@ private void btnRestablecerFabrica_Click(object sender, EventArgs e)
 
         private void btnPush_Click(object sender, EventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog();
-            ofd.Title = "Selecciona el archivo para enviar al teléfono";
+            string serial = ObtenerSerialSeleccionado();
+            if (serial == null) { MessageBox.Show("Selecciona un dispositivo primero."); return; }
 
+            OpenFileDialog ofd = new OpenFileDialog();
             if (ofd.ShowDialog() == DialogResult.OK)
             {
                 string destinoAndroid = "/sdcard/Download/";
                 txtSalidaArchivos.AppendText($"Enviando {ofd.SafeFileName} a {destinoAndroid}...\r\n");
-                string resultado = AdbHelper.RunCommand($"push \"{ofd.FileName}\" {destinoAndroid}");
+                string resultado = AdbHelper.RunCommand($"-s {serial} push \"{ofd.FileName}\" {destinoAndroid}");
                 txtSalidaArchivos.AppendText(resultado + "\r\n¡Envío completado!\r\n\r\n");
             }
         }
 
         private void btnPull_Click(object sender, EventArgs e)
         {
+            string serial = ObtenerSerialSeleccionado();
+            if (serial == null) { MessageBox.Show("Selecciona un dispositivo primero."); return; }
+
             string rutaAndroid = txtRutaAndroid.Text.Trim();
             if (string.IsNullOrEmpty(rutaAndroid)) { MessageBox.Show("Escribe la ruta del archivo."); return; }
 
             FolderBrowserDialog fbd = new FolderBrowserDialog();
-            fbd.Description = "Selecciona la carpeta donde guardar el archivo en tu PC";
-
             if (fbd.ShowDialog() == DialogResult.OK)
             {
                 txtSalidaArchivos.AppendText($"Descargando {rutaAndroid}...\r\n");
-                string resultado = AdbHelper.RunCommand($"pull \"{rutaAndroid}\" \"{fbd.SelectedPath}\"");
+                string resultado = AdbHelper.RunCommand($"-s {serial} pull \"{rutaAndroid}\" \"{fbd.SelectedPath}\"");
                 txtSalidaArchivos.AppendText(resultado + "\r\n¡Descarga completada!\r\n\r\n");
             }
         }
@@ -452,7 +505,7 @@ private void btnRestablecerFabrica_Click(object sender, EventArgs e)
 
             rtbLogcat = new RichTextBox();
             rtbLogcat.Location = new Point(20, 80);
-            rtbLogcat.Size = new Size(680, 430);
+            rtbLogcat.Size = new Size(710, 480);
             rtbLogcat.ReadOnly = true;
             rtbLogcat.Font = new Font("Consolas", 9);
             rtbLogcat.BackColor = Color.Black;
@@ -463,12 +516,16 @@ private void btnRestablecerFabrica_Click(object sender, EventArgs e)
 
         private void btnIniciarLogcat_Click(object sender, EventArgs e)
         {
+            string serial = ObtenerSerialSeleccionado();
+            if (serial == null && !_logcatActivo) { MessageBox.Show("Selecciona un dispositivo primero."); return; }
+
             if (!_logcatActivo)
             {
                 rtbLogcat.Clear();
                 _logcatProcess = new Process();
                 _logcatProcess.StartInfo.FileName = AdbHelper.AdbPath;
-                _logcatProcess.StartInfo.Arguments = "logcat -v brief";
+                // Agregamos el serial para apuntar al teléfono correcto
+                _logcatProcess.StartInfo.Arguments = $"-s {serial} logcat -v brief"; 
                 _logcatProcess.StartInfo.RedirectStandardOutput = true;
                 _logcatProcess.StartInfo.RedirectStandardError = true;
                 _logcatProcess.StartInfo.UseShellExecute = false;
